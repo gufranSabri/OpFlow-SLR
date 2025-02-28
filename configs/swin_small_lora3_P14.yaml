@@ -1,0 +1,28 @@
+base_config:
+  patch_size: [4, 4]
+  embed_dim: 96
+  depths: [2, 2, 18, 2]
+  num_heads: [3, 6, 12, 24]
+  window_size: [7, 7]
+  mlp_ratio: 4.0
+  dropout: 0.0
+  attention_dropout: 0.0
+  stochastic_depth_prob: 0.1
+  num_classes: 1296
+
+lora_config:
+  ranks: [4, 8, 16]
+  alphas: [0.1, 0.2, 0.4]
+  additional_ranks: [4]
+  additional_alphas: [0.1]
+
+training:
+  epochs: 50
+  base_lr: 0.0001
+  step: [ 20, 35]
+  learning_ratio: 1
+  weight_decay: 0.0001
+  batch_size: 2
+
+data:
+  path: /path/to/PHOENIX-2014
