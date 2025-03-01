@@ -1,23 +1,22 @@
 import os
+from tqdm import tqdm
 
 class Logger:
-    def __init__(self, file_path, verbose=True):
+    def __init__(self, file_path):
         print()
 
         if not os.path.exists("/".join(file_path.split("/")[:-1])):
             os.mkdir("/".join(file_path.split("/")[:-1]))
             
         self.file_path = file_path
-        self.verbose = verbose
 
-    def __call__(self, message, verbose=None):
+    def __call__(self, message, verbose=True):
         with open(self.file_path, "a") as f:
-            f.write(f"{message}\n")
+            f.write(f"{str(message)}\n")
 
             if verbose:
-                print(message)
-            elif self.verbose and verbose is not None:
-                print(message)
+                tqdm.write(str(message))
+                # print(message)
 
 
 

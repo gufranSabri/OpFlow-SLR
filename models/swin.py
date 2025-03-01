@@ -243,6 +243,10 @@ class ShiftedWindowAttention(nn.Module):
         relative_position_index = relative_coords.sum(-1).flatten()  # Wh*Ww*Wh*Ww
         self.register_buffer("relative_position_index", relative_position_index)
 
+        self.qkv_lora = None
+        self.proj_lora = None
+        
+
     def get_relative_position_bias(self) -> torch.Tensor:
         return _get_relative_position_bias(
             self.relative_position_bias_table, self.relative_position_index, self.window_size  # type: ignore[arg-type]
@@ -392,12 +396,12 @@ class SwinTransformer(nn.Module):
                 layers.append(downsample_layer(dim, norm_layer))
         self.features = nn.Sequential(*layers)
 
-        num_features = embed_dim * 2 ** (len(depths) - 1)
-        self.norm = norm_layer(num_features)
+        self.num_features = embed_dim * 2 ** (len(depths) - 1)
+        self.norm = norm_layer(self.num_features)
         self.permute = Permute([0, 3, 1, 2])  # B H W C -> B C H W
         self.avgpool = nn.AdaptiveAvgPool2d(1)
         self.flatten = nn.Flatten(1)
-        self.head = nn.Linear(num_features, num_classes)
+        self.head = nn.Linear(self.num_features, 1000)
 
         for m in self.modules():
             if isinstance(m, nn.Linear):
@@ -409,7 +413,7 @@ class SwinTransformer(nn.Module):
         msg = self.load_state_dict(model_w.state_dict())
         if self.logger is not None:
             self.logger(msg)
-        del self.head
+        self.head = nn.Linear(self.num_features, 512)
 
     def lorify(self, qkv_ranks, qkv_alphas, proj_ranks, proj_alphas):
         assert len(qkv_ranks) == len(qkv_alphas), "Each rank must have a corresponding alpha."
@@ -425,19 +429,18 @@ class SwinTransformer(nn.Module):
             if "lora" not in k and "stadapter" not in k:
                 v.requires_grad = False
 
+            if "head" in k:
+                v.requires_grad = True
+
         if self.logger is not None:
             self.logger("Lorified the model...\n")
             self.logger("Trainable parameters:")
-            for k,v in self.named_parameters():
-                if v.requires_grad:
-                    self.logger(k)
-        
         
             total_params = sum(p.numel() for p in self.parameters())
             num_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
             self.logger(f"\nTotal parameters: {total_params}")
             self.logger(f"Number of trainable parameters: {num_params}")
-            self.logger("Percentage of trainable parameters: ", "{:.2f}%".format(num_params/total_params * 100))
+            self.logger(f"Percentage of trainable parameters: {num_params/total_params * 100}")
             self.logger("\n")
 
     def forward(self, x):
@@ -448,6 +451,7 @@ class SwinTransformer(nn.Module):
         x = self.permute(x)
         x = self.avgpool(x)
         x = self.flatten(x)
+        x = self.head(x)
         return x
 
 
