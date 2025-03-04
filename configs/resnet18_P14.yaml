@@ -1,0 +1,29 @@
+model_args:
+  model: resnet18
+  use_bn: 1
+  share_classifier: True
+  weight_norm: False
+  conv_type: 2
+  hidden_size: 1024
+  num_classes: 1296
+
+training:
+  epochs: 50
+  batch_size: 2
+  clip_grad: False
+  device: 0,1
+
+optimizer_args:
+  optimizer: Adam
+  base_lr: 0.0001
+  step: [20, 35]
+  learning_ratio: 1
+  weight_decay: 0.0001
+  start_epoch: 0
+  nesterov: False
+
+data:
+  path: /path/to/PHOENIX-2014
+  gloss_dict_path: /home/g202302610/Code/OpFlow-SLR/datasets/phoenix2014/gloss_dict.npy
+  dataset_name: phoenix14
+  dataset_root: /home/g202302610/Code/OpFlow-SLR/datasets/phoenix2014

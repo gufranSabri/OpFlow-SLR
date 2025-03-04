@@ -84,7 +84,7 @@ def shifted_window_attention(
     training: bool = True,
 
     qkv_lora: Optional[MultiRankLoRA] = None,
-    proj_lora: Optional[MultiRankLoRA] = None
+    proj_lora: Optional[MultiRankLoRA] = None,
 ) -> Tensor:
     """
     Args:
@@ -189,6 +189,7 @@ def shifted_window_attention(
 
     # unpad features
     x = x[:, :H, :W, :].contiguous()
+
     return x
 
 
@@ -215,6 +216,7 @@ class ShiftedWindowAttention(nn.Module):
         self.num_heads = num_heads
         self.attention_dropout = attention_dropout
         self.dropout = dropout
+        self.dim = dim
 
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
         self.proj = nn.Linear(dim, dim, bias=proj_bias)
@@ -245,7 +247,6 @@ class ShiftedWindowAttention(nn.Module):
 
         self.qkv_lora = None
         self.proj_lora = None
-        
 
     def get_relative_position_bias(self) -> torch.Tensor:
         return _get_relative_position_bias(
@@ -278,7 +279,7 @@ class ShiftedWindowAttention(nn.Module):
             proj_bias=self.proj.bias,
             training=self.training,
             qkv_lora=self.qkv_lora,
-            proj_lora=self.proj_lora
+            proj_lora=self.proj_lora,
         )
     
 # ATTENTION CODE ==================================================================
@@ -323,6 +324,9 @@ class SwinTransformerBlock(nn.Module):
     def lorify(self, qkv_ranks, qkv_alphas, proj_ranks, proj_alphas):
         self.attn.lorify(qkv_ranks, qkv_alphas, proj_ranks, proj_alphas)
 
+    def ofify(self):
+        self.attn.ofify()
+
     def forward(self, x: Tensor):
         x = x + self.stochastic_depth(self.attn(self.norm1(x)))
         x = x + self.stochastic_depth(self.mlp(self.norm2(x)))
@@ -345,7 +349,7 @@ class SwinTransformer(nn.Module):
         norm_layer: Optional[Callable[..., nn.Module]] = None,
         block: Optional[Callable[..., nn.Module]] = None,
         downsample_layer: Callable[..., nn.Module] = PatchMerging,
-        logger = None
+        logger = None,
     ):
         super().__init__()
         self.num_classes = num_classes
@@ -444,8 +448,10 @@ class SwinTransformer(nn.Module):
             self.logger("\n")
 
     def forward(self, x):
-        for block in self.features:
-            x = block(x)
+        x = self.features(x)
+
+
+
 
         x = self.norm(x)
         x = self.permute(x)

@@ -1,1 +1,0 @@
-CUDA_VISIBLE_DEVICES=0 python main.py --config ./configs/swin_tiny_loraE_P14.yaml

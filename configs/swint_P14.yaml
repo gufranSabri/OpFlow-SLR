@@ -1,19 +1,21 @@
-swin_base_config:
-  patch_size: [4, 4]
-  embed_dim: 96
-  depths: [2, 2, 6, 2]
-  num_heads: [3, 6, 12, 24]
-  window_size: [7, 7]
-  mlp_ratio: 4.0
-  dropout: 0.0
-  attention_dropout: 0.0
-  stochastic_depth_prob: 0.2
-  num_classes: 1296
+# swin_base_config:
+#   patch_size: [4, 4]
+#   embed_dim: 96
+#   depths: [2, 2, 6, 2]
+#   num_heads: [3, 6, 12, 24]
+#   window_size: [7, 7]
+#   mlp_ratio: 4.0
+#   dropout: 0.0
+#   attention_dropout: 0.0
+#   stochastic_depth_prob: 0.2
+#   num_classes: 1296
+
+# op_flow: False
 
 model_args:
   model: swin_tiny
   use_bn: 1
-  share_classifier: False
+  share_classifier: True
   weight_norm: False
   conv_type: 2
   hidden_size: 1024
@@ -22,11 +24,13 @@ model_args:
 training:
   epochs: 50
   batch_size: 2
+  clip_grad: False
+  device: 0,1
 
 optimizer_args:
   optimizer: Adam
   base_lr: 0.0001
-  step: [ 20, 35]
+  step: [20, 35]
   learning_ratio: 1
   weight_decay: 0.0001
   start_epoch: 0
