@@ -19,6 +19,7 @@ from utils.scheduler import LinearDecayLR
 from datasets.dataloader_video import *
 
 from utils.device import GpuDataParallel
+from utils.optimizer import Optimizer
 
 from models.sync_batchnorm import convert_model
 
@@ -75,7 +76,7 @@ def train_epoch(model, optimizer, train_loader, device, config, logger):
             label_lgt.cpu().int()
         ).mean()
 
-        loss_kd = 10 * dist_fun(
+        loss_kd = 25 * dist_fun(
             ret_dict["conv_logits"],
             ret_dict["sequence_logits"].detach(),
             use_blank=False
@@ -167,12 +168,14 @@ def main(args):
     test_loader = construct_loader("test")
 
     model = build_model(config, logger)
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=config["optimizer_args"]["base_lr"],
-        weight_decay=config["optimizer_args"]["weight_decay"],
-    )
-    lr_scheduler=LinearDecayLR(optimizer, config["training"]["epochs"], 10)
+    # optimizer = torch.optim.Adam(
+    #     model.parameters(),
+    #     lr=config["optimizer_args"]["base_lr"],
+    #     weight_decay=config["optimizer_args"]["weight_decay"],
+    # )
+    # lr_scheduler=LinearDecayLR(optimizer, config["training"]["epochs"], 25)
+    optimizer = Optimizer(model, config["optimizer_args"])
+
 
     device = GpuDataParallel()
     device.set_device(config["training"]["device"])
@@ -185,7 +188,7 @@ def main(args):
             train_loss = train_epoch(model, optimizer, train_loader, device, config, logger)
             eval_wer = validation(model, val_loader, device, output_dir, config, logger, epoch)
 
-            logger(f"Learning Rate: {lr_scheduler.get_lr()}\n")
+            # logger(f"Learning Rate: {lr_scheduler.get_lr()}\n")
             logger('\tMean training loss: {:.10f}.'.format(train_loss))
             logger(f"\tValidation WER: {eval_wer}")
             logger("\n")
@@ -194,7 +197,8 @@ def main(args):
                 best_wer = eval_wer
                 save_model(model, optimizer, epoch, f"{output_dir}/models/best_model.pth")
 
-            lr_scheduler.step()
+            # lr_scheduler.step()
+            optimizer.scheduler.step()
 
     logger("\n")
 

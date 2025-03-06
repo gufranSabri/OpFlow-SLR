@@ -6,11 +6,23 @@ import numpy as np
 from models.BiLSTM import BiLSTMLayer
 from models.tconv import TemporalConv
 from models.decode import Decode
+import torch.nn.functional as F
 
+
+
+class NormLinear(nn.Module):
+    def __init__(self, in_dim, out_dim):
+        super(NormLinear, self).__init__()
+        self.weight = nn.Parameter(torch.Tensor(in_dim, out_dim))
+        nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+
+    def forward(self, x):
+        outputs = torch.matmul(x, F.normalize(self.weight, dim=0))
+        return outputs
 
 class SLRModel(nn.Module):
     def __init__(
-        self, num_classes, conv_type, use_bn=False,
+        self, num_classes, conv_type, use_bn=False, weight_norm=True,
         hidden_size=1024, gloss_dict=None, share_classifier=True,
         config=None, logger=None
     ):
@@ -55,8 +67,12 @@ class SLRModel(nn.Module):
             bidirectional=True
         )
 
-        self.classifier = nn.Linear(hidden_size, self.num_classes)
-        self.conv1d.fc = nn.Linear(hidden_size, self.num_classes)
+        if weight_norm:
+            self.classifier = NormLinear(hidden_size, self.num_classes)
+            self.conv1d.fc = NormLinear(hidden_size, self.num_classes)
+        else:
+            self.classifier = nn.Linear(hidden_size, self.num_classes)
+            self.conv1d.fc = nn.Linear(hidden_size, self.num_classes)
 
         if share_classifier:
             self.conv1d.fc = self.classifier
@@ -78,10 +94,13 @@ class SLRModel(nn.Module):
         return x
 
     def forward(self, x, len_x):
-        batch, temp, channel, height, width = x.shape
-        inputs = x.reshape(batch * temp, channel, height, width)
-        framewise = self.visual_features(inputs, len_x)
-        framewise = framewise.reshape(batch, temp, -1).transpose(1, 2)
+        if len(x.shape) == 5:
+            batch, temp, channel, height, width = x.shape
+            inputs = x.reshape(batch * temp, channel, height, width)
+            framewise = self.visual_features(inputs, len_x)
+            framewise = framewise.reshape(batch, temp, -1).transpose(1, 2)
+        else:
+            framewise = x
 
         conv1d_outputs = self.conv1d(framewise, len_x)
         x = conv1d_outputs['visual_feat']
@@ -110,6 +129,7 @@ def build_model(config, logger):
         num_classes=config["model_args"]["num_classes"],
         conv_type=config["model_args"]["conv_type"],
         use_bn=config["model_args"]["use_bn"],
+        weight_norm=config["model_args"]["weight_norm"],
         hidden_size=config["model_args"]["hidden_size"],
         gloss_dict=config["data"]["gloss_dict_path"],
         share_classifier=config["model_args"]["share_classifier"],
